@@ -1,0 +1,1112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SentinelAI — Data Logs</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #050810;
+    --surface: #0b0f1a;
+    --surface2: #111827;
+    --border: #1e2a3a;
+    --border2: #243040;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --accent: #00d4ff;
+    --accent2: #7c3aed;
+    --green: #10b981;
+    --yellow: #f59e0b;
+    --red: #ef4444;
+    --orange: #f97316;
+    --pink: #ec4899;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Scanline overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,212,255,0.012) 2px,
+      rgba(0,212,255,0.012) 4px
+    );
+    pointer-events: none;
+    z-index: 1000;
+  }
+
+  /* Header */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 28px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(11,15,26,0.95);
+    backdrop-filter: blur(20px);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .logo-icon {
+    width: 32px;
+    height: 32px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+  }
+
+  .logo-text {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 18px;
+    letter-spacing: -0.5px;
+    color: var(--text);
+  }
+
+  .logo-text span { color: var(--accent); }
+
+  .header-center {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+  }
+
+  .live-dot {
+    width: 6px;
+    height: 6px;
+    background: var(--green);
+    border-radius: 50%;
+    animation: pulse-dot 1.5s infinite;
+    box-shadow: 0 0 6px var(--green);
+  }
+
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .timestamp {
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .btn {
+    padding: 6px 14px;
+    border: 1px solid var(--border2);
+    background: var(--surface2);
+    color: var(--text);
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    transition: all 0.15s;
+    letter-spacing: 0.03em;
+  }
+
+  .btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    box-shadow: 0 0 12px rgba(0,212,255,0.15);
+  }
+
+  .btn-primary {
+    background: rgba(0,212,255,0.1);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  /* Stats bar */
+  .stats-bar {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+
+  .stat-item {
+    padding: 14px 20px;
+    border-right: 1px solid var(--border);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .stat-item:last-child { border-right: none; }
+
+  .stat-label {
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 6px;
+  }
+
+  .stat-value {
+    font-family: 'Syne', sans-serif;
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .stat-sub {
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  .stat-item::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    border-radius: 1px;
+  }
+
+  .stat-item.green::after { background: var(--green); }
+  .stat-item.red::after { background: var(--red); }
+  .stat-item.yellow::after { background: var(--yellow); }
+  .stat-item.accent::after { background: var(--accent); }
+  .stat-item.orange::after { background: var(--orange); }
+  .stat-item.purple::after { background: var(--accent2); }
+
+  /* Main layout */
+  .main {
+    display: grid;
+    grid-template-columns: 260px 1fr 300px;
+    height: calc(100vh - 120px);
+  }
+
+  /* Sidebar */
+  .sidebar {
+    border-right: 1px solid var(--border);
+    background: var(--surface);
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border2) transparent;
+  }
+
+  .sidebar-section {
+    padding: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sidebar-title {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .filter-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 7px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.12s;
+    margin-bottom: 2px;
+  }
+
+  .filter-item:hover { background: var(--surface2); }
+  .filter-item.active { background: rgba(0,212,255,0.08); }
+
+  .filter-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+  }
+
+  .filter-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+  }
+
+  .filter-count {
+    font-size: 10px;
+    color: var(--muted);
+    background: var(--surface2);
+    padding: 1px 7px;
+    border-radius: 10px;
+  }
+
+  /* Services */
+  .service-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 10px;
+    border-radius: 6px;
+    margin-bottom: 2px;
+    cursor: pointer;
+    transition: background 0.12s;
+  }
+
+  .service-item:hover { background: var(--surface2); }
+
+  .service-name { font-size: 12px; }
+  .service-status {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+  }
+
+  /* Log stream */
+  .log-stream {
+    background: var(--bg);
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border2) transparent;
+    position: relative;
+  }
+
+  .log-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  .search-box {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    padding: 6px 12px;
+  }
+
+  .search-box input {
+    background: none;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    width: 100%;
+  }
+
+  .search-box input::placeholder { color: var(--muted); }
+
+  .toolbar-icon {
+    color: var(--muted);
+    font-size: 14px;
+  }
+
+  .log-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .log-table thead {
+    position: sticky;
+    top: 45px;
+    z-index: 9;
+    background: var(--surface);
+  }
+
+  .log-table th {
+    padding: 8px 14px;
+    text-align: left;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .log-table td {
+    padding: 7px 14px;
+    border-bottom: 1px solid rgba(30,42,58,0.5);
+    vertical-align: top;
+    white-space: nowrap;
+  }
+
+  .log-row {
+    animation: fadeIn 0.3s ease;
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+
+  .log-row:hover { background: rgba(255,255,255,0.025); }
+
+  .log-row.new-entry {
+    animation: newRow 0.5s ease;
+  }
+
+  @keyframes newRow {
+    from { background: rgba(0,212,255,0.08); }
+    to { background: transparent; }
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .level-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .level-info { background: rgba(0,212,255,0.12); color: var(--accent); }
+  .level-warn { background: rgba(245,158,11,0.12); color: var(--yellow); }
+  .level-error { background: rgba(239,68,68,0.15); color: var(--red); }
+  .level-debug { background: rgba(124,58,237,0.12); color: var(--accent2); }
+  .level-critical { background: rgba(239,68,68,0.25); color: #ff6b6b; }
+  .level-success { background: rgba(16,185,129,0.12); color: var(--green); }
+
+  .ts { color: var(--muted); font-size: 11px; }
+  .service-tag {
+    display: inline-block;
+    padding: 2px 8px;
+    background: var(--surface2);
+    border-radius: 4px;
+    font-size: 11px;
+    color: var(--text);
+    border: 1px solid var(--border2);
+    white-space: nowrap;
+  }
+
+  .log-msg { font-size: 12px; max-width: 400px; overflow: hidden; text-overflow: ellipsis; }
+  .log-msg .highlight { color: var(--accent); }
+  .log-msg .val { color: var(--green); }
+  .log-msg .err { color: var(--red); }
+  .log-msg .warn-text { color: var(--yellow); }
+
+  .trace-id { color: var(--muted); font-size: 10px; font-family: monospace; }
+  .latency { font-size: 12px; }
+  .latency.high { color: var(--red); }
+  .latency.med { color: var(--yellow); }
+  .latency.low { color: var(--green); }
+
+  /* Right panel */
+  .right-panel {
+    border-left: 1px solid var(--border);
+    background: var(--surface);
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border2) transparent;
+  }
+
+  .panel-section {
+    padding: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .panel-title {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 13px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  /* Anomaly card */
+  .anomaly-card {
+    background: var(--bg);
+    border: 1px solid var(--border2);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 8px;
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+
+  .anomaly-card:hover { border-color: var(--accent); }
+
+  .anomaly-card.critical { border-left: 3px solid var(--red); }
+  .anomaly-card.warning { border-left: 3px solid var(--yellow); }
+  .anomaly-card.info { border-left: 3px solid var(--accent); }
+
+  .anomaly-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+
+  .anomaly-name { font-size: 12px; font-weight: 600; }
+  .anomaly-time { font-size: 10px; color: var(--muted); }
+
+  .anomaly-detail { font-size: 11px; color: var(--muted); margin-bottom: 8px; }
+
+  .confidence-bar {
+    height: 3px;
+    background: var(--border2);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .confidence-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 1s ease;
+  }
+
+  .confidence-label {
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 4px;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  /* Mini chart */
+  .mini-chart {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 32px;
+    margin-top: 8px;
+  }
+
+  .chart-bar {
+    flex: 1;
+    background: var(--border2);
+    border-radius: 2px 2px 0 0;
+    transition: height 0.5s ease, background 0.3s;
+    min-height: 2px;
+  }
+
+  .chart-bar.active { background: var(--accent); }
+  .chart-bar.alert { background: var(--red); }
+  .chart-bar.warn { background: var(--yellow); }
+
+  /* Active incident banner */
+  .incident-banner {
+    background: linear-gradient(135deg, rgba(239,68,68,0.1), rgba(239,68,68,0.05));
+    border: 1px solid rgba(239,68,68,0.3);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 8px;
+  }
+
+  .incident-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--red);
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .incident-desc { font-size: 11px; color: var(--muted); margin-bottom: 8px; }
+
+  .tag-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .tag {
+    font-size: 10px;
+    padding: 2px 7px;
+    background: var(--surface2);
+    border-radius: 3px;
+    color: var(--muted);
+    border: 1px solid var(--border2);
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+  /* Glowing row */
+  .log-row.critical-row td { background: rgba(239,68,68,0.04); }
+  .log-row.critical-row:hover td { background: rgba(239,68,68,0.08); }
+
+  /* Pagination/tail bar */
+  .tail-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 16px;
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+    position: sticky;
+    bottom: 0;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .tail-mode {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--green);
+  }
+
+  /* Sparkline in stats */
+  .sparkline {
+    display: flex;
+    align-items: flex-end;
+    gap: 1px;
+    height: 16px;
+    margin-top: 4px;
+  }
+
+  .spark-bar {
+    width: 3px;
+    background: currentColor;
+    border-radius: 1px;
+    opacity: 0.4;
+  }
+
+  .spark-bar:last-child { opacity: 1; }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header class="header">
+  <div class="logo">
+    <div class="logo-icon">⬡</div>
+    <div class="logo-text">Sentinel<span>AI</span></div>
+  </div>
+  <div class="header-center">
+    <div class="live-dot"></div>
+    <span>LIVE TELEMETRY STREAM</span>
+    <span style="color:var(--border2)">|</span>
+    <span>INGESTING 847K EVENTS/SEC</span>
+  </div>
+  <div class="header-right">
+    <div class="timestamp" id="clock">2026-06-06 · 14:33:08 UTC</div>
+    <button class="btn">Export</button>
+    <button class="btn btn-primary">⚡ AI Investigate</button>
+  </div>
+</header>
+
+<!-- Stats bar -->
+<div class="stats-bar">
+  <div class="stat-item accent">
+    <div class="stat-label">Total Events (1h)</div>
+    <div class="stat-value" style="color:var(--accent)" id="totalEvents">3.04M</div>
+    <div class="stat-sub">↑ 12% vs prior hour</div>
+  </div>
+  <div class="stat-item red">
+    <div class="stat-label">Errors</div>
+    <div class="stat-value" style="color:var(--red)" id="errorCount">1,247</div>
+    <div class="stat-sub">↑ 400% spike detected</div>
+  </div>
+  <div class="stat-item yellow">
+    <div class="stat-label">Warnings</div>
+    <div class="stat-value" style="color:var(--yellow)">8,930</div>
+    <div class="stat-sub">↑ 23% vs baseline</div>
+  </div>
+  <div class="stat-item green">
+    <div class="stat-label">Avg Latency</div>
+    <div class="stat-value" style="color:var(--green)">142ms</div>
+    <div class="stat-sub">P99: 890ms ⚠</div>
+  </div>
+  <div class="stat-item orange">
+    <div class="stat-label">Active Anomalies</div>
+    <div class="stat-value" style="color:var(--orange)" id="anomalyCount">7</div>
+    <div class="stat-sub">3 critical, 4 warning</div>
+  </div>
+  <div class="stat-item purple">
+    <div class="stat-label">MTTR (current)</div>
+    <div class="stat-value" style="color:var(--accent2)">4.2m</div>
+    <div class="stat-sub">↓ 68% from 13.1m</div>
+  </div>
+</div>
+
+<!-- Main -->
+<div class="main">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-title">⬝ Log Level</div>
+      <div class="filter-item active">
+        <div class="filter-left"><div class="filter-dot" style="background:var(--text)"></div> All Levels</div>
+        <span class="filter-count">3.04M</span>
+      </div>
+      <div class="filter-item">
+        <div class="filter-left"><div class="filter-dot" style="background:var(--red)"></div> Critical</div>
+        <span class="filter-count">89</span>
+      </div>
+      <div class="filter-item">
+        <div class="filter-left"><div class="filter-dot" style="background:var(--red)"></div> Error</div>
+        <span class="filter-count">1,247</span>
+      </div>
+      <div class="filter-item">
+        <div class="filter-left"><div class="filter-dot" style="background:var(--yellow)"></div> Warn</div>
+        <span class="filter-count">8,930</span>
+      </div>
+      <div class="filter-item">
+        <div class="filter-left"><div class="filter-dot" style="background:var(--accent)"></div> Info</div>
+        <span class="filter-count">2.82M</span>
+      </div>
+      <div class="filter-item">
+        <div class="filter-left"><div class="filter-dot" style="background:var(--accent2)"></div> Debug</div>
+        <span class="filter-count">198K</span>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-title">◫ Services</div>
+      <div class="service-item">
+        <span class="service-name">api-gateway</span>
+        <div class="service-status" style="background:var(--yellow);box-shadow:0 0 4px var(--yellow)"></div>
+      </div>
+      <div class="service-item">
+        <span class="service-name">auth-service</span>
+        <div class="service-status" style="background:var(--green);box-shadow:0 0 4px var(--green)"></div>
+      </div>
+      <div class="service-item">
+        <span class="service-name">payment-svc</span>
+        <div class="service-status" style="background:var(--red);box-shadow:0 0 4px var(--red)"></div>
+      </div>
+      <div class="service-item">
+        <span class="service-name">user-service</span>
+        <div class="service-status" style="background:var(--green);box-shadow:0 0 4px var(--green)"></div>
+      </div>
+      <div class="service-item">
+        <span class="service-name">notification-svc</span>
+        <div class="service-status" style="background:var(--green);box-shadow:0 0 4px var(--green)"></div>
+      </div>
+      <div class="service-item">
+        <span class="service-name">postgres-primary</span>
+        <div class="service-status" style="background:var(--red);box-shadow:0 0 4px var(--red)"></div>
+      </div>
+      <div class="service-item">
+        <span class="service-name">redis-cache</span>
+        <div class="service-status" style="background:var(--green);box-shadow:0 0 4px var(--green)"></div>
+      </div>
+      <div class="service-item">
+        <span class="service-name">k8s-scheduler</span>
+        <div class="service-status" style="background:var(--yellow);box-shadow:0 0 4px var(--yellow)"></div>
+      </div>
+      <div class="service-item">
+        <span class="service-name">cdn-edge-01</span>
+        <div class="service-status" style="background:var(--green);box-shadow:0 0 4px var(--green)"></div>
+      </div>
+      <div class="service-item">
+        <span class="service-name">ml-inference</span>
+        <div class="service-status" style="background:var(--green);box-shadow:0 0 4px var(--green)"></div>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-title">◈ Environments</div>
+      <div class="filter-item active">
+        <div class="filter-left"><div class="filter-dot" style="background:var(--orange)"></div> production</div>
+        <span class="filter-count">2.1M</span>
+      </div>
+      <div class="filter-item">
+        <div class="filter-left"><div class="filter-dot" style="background:var(--accent2)"></div> staging</div>
+        <span class="filter-count">340K</span>
+      </div>
+      <div class="filter-item">
+        <div class="filter-left"><div class="filter-dot" style="background:var(--muted)"></div> dev</div>
+        <span class="filter-count">600K</span>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-title">⊞ Data Sources</div>
+      <div class="filter-item">
+        <div class="filter-left"><div class="filter-dot" style="background:var(--accent)"></div> Logs</div>
+        <span class="filter-count">1.8M</span>
+      </div>
+      <div class="filter-item">
+        <div class="filter-left"><div class="filter-dot" style="background:var(--green)"></div> Metrics</div>
+        <span class="filter-count">820K</span>
+      </div>
+      <div class="filter-item">
+        <div class="filter-left"><div class="filter-dot" style="background:var(--pink)"></div> Traces</div>
+        <span class="filter-count">320K</span>
+      </div>
+      <div class="filter-item">
+        <div class="filter-left"><div class="filter-dot" style="background:var(--yellow)"></div> Events</div>
+        <span class="filter-count">100K</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Log stream -->
+  <section class="log-stream">
+    <div class="log-toolbar">
+      <div class="search-box">
+        <span class="toolbar-icon">⌕</span>
+        <input type="text" placeholder="Search logs... (e.g. level:error service:payment-svc)" />
+      </div>
+      <button class="btn">Time Range: 1h</button>
+      <button class="btn">Fields ▾</button>
+      <button class="btn">Group By ▾</button>
+    </div>
+
+    <table class="log-table">
+      <thead>
+        <tr>
+          <th style="width:130px">Timestamp</th>
+          <th style="width:80px">Level</th>
+          <th style="width:130px">Service</th>
+          <th>Message</th>
+          <th style="width:80px">Latency</th>
+          <th style="width:120px">Trace ID</th>
+        </tr>
+      </thead>
+      <tbody id="logBody">
+      </tbody>
+    </table>
+
+    <div class="tail-bar">
+      <div class="tail-mode">
+        <div class="live-dot"></div>
+        Tailing live · auto-scroll on
+      </div>
+      <span id="logCount">Showing 50 of 3,047,291 events</span>
+      <span>↓ Scroll to load more</span>
+    </div>
+  </section>
+
+  <!-- Right panel -->
+  <aside class="right-panel">
+
+    <!-- Active incident -->
+    <div class="panel-section">
+      <div class="panel-title">
+        <span>🔴 Active Incidents</span>
+        <span style="font-size:10px;color:var(--red);font-family:'JetBrains Mono'">3 OPEN</span>
+      </div>
+
+      <div class="incident-banner">
+        <div class="incident-title">
+          <span>●</span> INC-2847 · DB Pool Exhausted
+        </div>
+        <div class="incident-desc">Connection pool exhausted after v2.4.1 deployment. 92% confidence. Payment service degraded.</div>
+        <div class="tag-row">
+          <span class="tag">payment-svc</span>
+          <span class="tag">postgres-primary</span>
+          <span class="tag">SEV-1</span>
+          <span class="tag">7m ago</span>
+        </div>
+      </div>
+
+      <div class="anomaly-card warning">
+        <div class="anomaly-header">
+          <span class="anomaly-name">⚠ API Gateway Latency Spike</span>
+          <span class="anomaly-time">2m ago</span>
+        </div>
+        <div class="anomaly-detail">P99 latency: 890ms (+320% above baseline)</div>
+        <div class="confidence-bar"><div class="confidence-fill" style="width:78%;background:var(--yellow)"></div></div>
+        <div class="confidence-label"><span>AI Confidence</span><span style="color:var(--yellow)">78%</span></div>
+      </div>
+
+      <div class="anomaly-card info">
+        <div class="anomaly-header">
+          <span class="anomaly-name">◈ K8s Pod OOMKilled ×3</span>
+          <span class="anomaly-time">11m ago</span>
+        </div>
+        <div class="anomaly-detail">3 pods in ml-inference namespace OOMKilled</div>
+        <div class="confidence-bar"><div class="confidence-fill" style="width:65%;background:var(--accent)"></div></div>
+        <div class="confidence-label"><span>AI Confidence</span><span style="color:var(--accent)">65%</span></div>
+      </div>
+    </div>
+
+    <!-- Anomaly detection -->
+    <div class="panel-section">
+      <div class="panel-title">
+        <span>AI Anomaly Engine</span>
+        <span style="font-size:10px;color:var(--muted)">ISOLATION FOREST</span>
+      </div>
+
+      <div style="font-size:11px;color:var(--muted);margin-bottom:12px;">Error rate — last 60 min</div>
+      <div class="mini-chart" id="anomalyChart"></div>
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:6px;">
+        <span>-60m</span><span>-30m</span><span>now</span>
+      </div>
+
+      <div style="margin-top:14px;display:flex;flex-direction:column;gap:8px;">
+        <div style="display:flex;justify-content:space-between;font-size:11px;">
+          <span style="color:var(--muted)">Anomaly Score</span>
+          <span style="color:var(--red)">0.94 / 1.0 ⚠</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;">
+          <span style="color:var(--muted)">Baseline Error Rate</span>
+          <span style="color:var(--green)">0.3%</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;">
+          <span style="color:var(--muted)">Current Error Rate</span>
+          <span style="color:var(--red)">14.8%</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;">
+          <span style="color:var(--muted)">Detection Method</span>
+          <span style="color:var(--accent2)">Isolation Forest</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Root cause -->
+    <div class="panel-section">
+      <div class="panel-title">
+        <span>Root Cause Analysis</span>
+        <span style="font-size:10px;color:var(--green)">92% CONF</span>
+      </div>
+      <div style="font-size:11px;color:var(--text);line-height:1.7;background:var(--bg);padding:12px;border-radius:6px;border:1px solid var(--border2);">
+        <span style="color:var(--muted)">▸ </span>DB connection pool exhausted<br>
+        <span style="color:var(--muted)">▸ </span>Triggered by <span style="color:var(--yellow)">deploy v2.4.1</span> (7m ago)<br>
+        <span style="color:var(--muted)">▸ </span>Query latency <span style="color:var(--red)">+1020%</span><br>
+        <span style="color:var(--muted)">▸ </span>Downstream: <span style="color:var(--orange)">payment-svc</span>, <span style="color:var(--orange)">user-svc</span>
+      </div>
+      <div style="margin-top:10px;">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px;">Recommended Fix</div>
+        <div style="font-size:11px;color:var(--green);background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.2);border-radius:6px;padding:10px;line-height:1.7;">
+          1. Rollback to v2.4.0<br>
+          2. Increase pool_size: 10→50<br>
+          3. Add connection timeout<br>
+          4. Deploy with canary release
+        </div>
+      </div>
+    </div>
+
+    <!-- Business impact -->
+    <div class="panel-section">
+      <div class="panel-title">Business Impact</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div style="display:flex;justify-content:space-between;font-size:11px;">
+          <span style="color:var(--muted)">Failed Transactions</span>
+          <span style="color:var(--red)">~2,340</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;">
+          <span style="color:var(--muted)">Est. Revenue Impact</span>
+          <span style="color:var(--red)">~$47K/hr</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;">
+          <span style="color:var(--muted)">Affected Users</span>
+          <span style="color:var(--yellow)">~18,400</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;">
+          <span style="color:var(--muted)">Incident Duration</span>
+          <span style="color:var(--text)" id="incidentTime">7m 23s</span>
+        </div>
+      </div>
+    </div>
+
+  </aside>
+</div>
+
+<script>
+const logData = [
+  { level:'CRITICAL', service:'postgres-primary', msg:'Connection pool exhausted: <span class="err">max_connections=10 reached</span>. Queuing <span class="val">847</span> requests.', latency:'2340ms', trace:'a3f7c2d1', env:'prod', ts: 0 },
+  { level:'ERROR', service:'payment-svc', msg:'<span class="err">DatabaseException</span>: Could not acquire connection from pool after <span class="val">30000ms</span>', latency:'30100ms', trace:'b1e9a4f2', env:'prod', ts: 1 },
+  { level:'ERROR', service:'payment-svc', msg:'Transaction <span class="val">txn_4829</span> failed: <span class="err">ConnectionTimeout</span>. Retry <span class="val">3/3</span> exhausted.', latency:'30200ms', trace:'c8d3b5e7', env:'prod', ts: 2 },
+  { level:'WARN',  service:'api-gateway',  msg:'Upstream <span class="warn-text">payment-svc</span> latency threshold exceeded: <span class="val">890ms</span> > <span class="warn-text">500ms</span>', latency:'890ms', trace:'d4a7f1c9', env:'prod', ts: 3 },
+  { level:'ERROR', service:'payment-svc', msg:'<span class="err">HTTP 503</span> returned to client: service_unavailable — <span class="val">txn_4831</span>', latency:'31ms', trace:'e2c5b8d4', env:'prod', ts: 4 },
+  { level:'INFO',  service:'auth-service', msg:'JWT issued for user <span class="val">usr_88231</span> · scope=<span class="highlight">payment:write</span> · exp=3600s', latency:'18ms', trace:'f6e1a3b7', env:'prod', ts: 5 },
+  { level:'WARN',  service:'k8s-scheduler', msg:'Pod <span class="warn-text">ml-inference-7d9f-xk2p</span> OOMKilled: memory <span class="val">2.1Gi</span> > limit <span class="warn-text">2Gi</span>', latency:'—', trace:'g9d4c2e8', env:'prod', ts: 6 },
+  { level:'INFO',  service:'user-service', msg:'Cache HIT for key <span class="highlight">user:profile:88231</span> · TTL remaining: <span class="val">284s</span>', latency:'3ms', trace:'h7b5a1d3', env:'prod', ts: 7 },
+  { level:'ERROR', service:'postgres-primary', msg:'Slow query detected: <span class="err">45230ms</span> — <span class="val">SELECT * FROM orders WHERE user_id=?</span> (missing index)', latency:'45230ms', trace:'i1f8c4b2', env:'prod', ts: 8 },
+  { level:'DEBUG', service:'ml-inference',  msg:'Anomaly detection pass complete: <span class="val">847</span> series analyzed, <span class="highlight">7 anomalies</span> flagged in <span class="val">234ms</span>', latency:'234ms', trace:'j3e7d5a9', env:'prod', ts: 9 },
+  { level:'INFO',  service:'notification-svc', msg:'Email dispatched to <span class="val">ops@company.com</span> · subject="INC-2847 SEV-1 opened" · provider=<span class="highlight">SendGrid</span>', latency:'122ms', trace:'k5c2b8f1', env:'prod', ts: 10 },
+  { level:'WARN',  service:'api-gateway',  msg:'Rate limit approaching for IP <span class="warn-text">203.0.113.42</span>: <span class="val">4800/5000</span> req/min', latency:'2ms', trace:'l8a4e7d3', env:'prod', ts: 11 },
+  { level:'INFO',  service:'redis-cache',  msg:'Eviction triggered: <span class="val">LRU policy</span> · freed <span class="highlight">420MB</span> · hit_ratio=<span class="val">94.2%</span>', latency:'8ms', trace:'m2f9c5b7', env:'prod', ts: 12 },
+  { level:'ERROR', service:'payment-svc', msg:'Stripe webhook <span class="err">FAILED</span>: signature mismatch · event_id=<span class="val">evt_3P9xKL</span>', latency:'45ms', trace:'n6d3a1e8', env:'prod', ts: 13 },
+  { level:'INFO',  service:'auth-service', msg:'OAuth2 callback processed · provider=<span class="highlight">Google</span> · user=<span class="val">usr_91042</span> · new_session=true', latency:'31ms', trace:'o4b7f2c9', env:'prod', ts: 14 },
+  { level:'CRITICAL', service:'postgres-primary', msg:'Replication lag critical: <span class="err">replica_lag=47s</span> on <span class="val">db-replica-02</span> — data loss risk', latency:'—', trace:'p1e5d8a3', env:'prod', ts: 15 },
+  { level:'INFO',  service:'user-service', msg:'User <span class="val">usr_88231</span> profile updated · fields=[email, avatar] · audit_logged=true', latency:'24ms', trace:'q7c4b1f6', env:'prod', ts: 16 },
+  { level:'WARN',  service:'k8s-scheduler', msg:'Node <span class="warn-text">worker-node-03</span> memory pressure: <span class="val">87%</span> used · eviction threshold at <span class="warn-text">90%</span>', latency:'—', trace:'r3a8e2d7', env:'prod', ts: 17 },
+  { level:'DEBUG', service:'ml-inference',  msg:'Model <span class="highlight">isolation-forest-v3</span> inference complete · score=<span class="val">0.94</span> · features=<span class="val">128</span>', latency:'18ms', trace:'s5f1c9b4', env:'prod', ts: 18 },
+  { level:'INFO',  service:'cdn-edge-01',  msg:'Cache PURGE completed · paths=<span class="val">342</span> · region=<span class="highlight">us-east-1</span> · triggered_by=deploy', latency:'67ms', trace:'t9d6a3e1', env:'prod', ts: 19 },
+  { level:'SUCCESS', service:'auth-service', msg:'Health check PASSED · uptime=<span class="val">99.97%</span> · latency_p99=<span class="val">48ms</span> · connections=<span class="val">240/500</span>', latency:'2ms', trace:'u2b4f7c8', env:'prod', ts: 20 },
+  { level:'ERROR', service:'payment-svc', msg:'<span class="err">CircuitBreaker OPEN</span>: failure_rate=<span class="val">68%</span> > threshold=<span class="warn-text">50%</span>. Requests rejected.', latency:'1ms', trace:'v8e3d1a5', env:'prod', ts: 21 },
+  { level:'INFO',  service:'api-gateway',  msg:'gRPC request routed: <span class="highlight">CheckoutService/ProcessPayment</span> → payment-svc · attempt=1', latency:'14ms', trace:'w4c7b9f2', env:'prod', ts: 22 },
+  { level:'WARN',  service:'postgres-primary', msg:'Table <span class="warn-text">orders</span> autovacuum triggered: <span class="val">dead_tuples=4.2M</span> · table_bloat=<span class="warn-text">18%</span>', latency:'—', trace:'x6a1e8d4', env:'prod', ts: 23 },
+  { level:'INFO',  service:'notification-svc', msg:'PagerDuty alert fired · incident_key=<span class="highlight">INC-2847</span> · on_call=<span class="val">@sre-team</span>', latency:'89ms', trace:'y3f5c2b9', env:'prod', ts: 24 },
+  { level:'DEBUG', service:'redis-cache',  msg:'Keyspace analysis: <span class="val">1.24M</span> keys · largest_key=<span class="highlight">session:bulk:export</span> → <span class="val">4.1MB</span>', latency:'4ms', trace:'z1d8a4e7', env:'prod', ts: 25 },
+  { level:'INFO',  service:'user-service', msg:'Batch job completed: <span class="highlight">daily-digest</span> · users_notified=<span class="val">12,440</span> · duration=<span class="val">4.2s</span>', latency:'4200ms', trace:'aa2c5f1b', env:'prod', ts: 26 },
+  { level:'WARN',  service:'api-gateway',  msg:'SSL cert expiry in <span class="warn-text">14 days</span> for <span class="val">api.company.com</span> · auto_renew=<span class="warn-text">DISABLED</span>', latency:'—', trace:'bb7e3d9c', env:'prod', ts: 27 },
+  { level:'ERROR', service:'ml-inference',  msg:'GPU <span class="err">OOM</span> on device <span class="val">cuda:0</span> · requested=<span class="val">4.8GB</span> · available=<span class="warn-text">3.9GB</span> · falling back to CPU', latency:'—', trace:'cc4a1f8e', env:'prod', ts: 28 },
+  { level:'INFO',  service:'postgres-primary', msg:'Query plan: <span class="highlight">Seq Scan → Index Scan</span> after ANALYZE · estimated speedup <span class="val">40x</span>', latency:'12ms', trace:'dd9b6c3a', env:'prod', ts: 29 },
+];
+
+const levelColors = {
+  CRITICAL: 'level-critical',
+  ERROR:    'level-error',
+  WARN:     'level-warn',
+  INFO:     'level-info',
+  DEBUG:    'level-debug',
+  SUCCESS:  'level-success',
+};
+
+const latencyClass = (lat) => {
+  const n = parseInt(lat);
+  if (isNaN(n) || lat === '—') return '';
+  if (n > 5000) return 'high';
+  if (n > 500) return 'med';
+  return 'low';
+};
+
+function timeAgo(i) {
+  const ago = 29 - i;
+  const now = new Date();
+  now.setSeconds(now.getSeconds() - ago * 4);
+  return now.toISOString().replace('T', ' ').slice(0, 19);
+}
+
+function renderLogs() {
+  const tbody = document.getElementById('logBody');
+  tbody.innerHTML = '';
+  logData.forEach((row, i) => {
+    const tr = document.createElement('tr');
+    tr.className = `log-row${row.level === 'CRITICAL' || row.level === 'ERROR' ? ' critical-row' : ''}`;
+    tr.innerHTML = `
+      <td class="ts">${timeAgo(i)}</td>
+      <td><span class="level-badge ${levelColors[row.level]}">${row.level}</span></td>
+      <td><span class="service-tag">${row.service}</span></td>
+      <td class="log-msg">${row.msg}</td>
+      <td class="latency ${latencyClass(row.latency)}">${row.latency}</td>
+      <td class="trace-id">${row.trace}…</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// Anomaly mini chart
+function renderChart() {
+  const chart = document.getElementById('anomalyChart');
+  chart.innerHTML = '';
+  const vals = [2,3,2,4,3,2,3,5,4,6,8,5,4,3,5,7,12,18,25,40,60,72,65,70,68,74,62,58,64,70];
+  const max = Math.max(...vals);
+  vals.forEach((v, i) => {
+    const bar = document.createElement('div');
+    bar.className = 'chart-bar';
+    const h = Math.max(2, (v / max) * 100);
+    bar.style.height = h + '%';
+    if (v > 50) bar.classList.add('alert');
+    else if (v > 20) bar.classList.add('warn');
+    else if (i >= 28) bar.classList.add('active');
+    chart.appendChild(bar);
+  });
+}
+
+// Clock
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent =
+    now.toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
+}
+
+// Incident timer
+let incidentSeconds = 443;
+function updateIncident() {
+  incidentSeconds++;
+  const m = Math.floor(incidentSeconds / 60);
+  const s = incidentSeconds % 60;
+  document.getElementById('incidentTime').textContent = `${m}m ${s}s`;
+}
+
+// Live log injection simulation
+let counter = 0;
+const liveMessages = [
+  { level:'INFO', service:'api-gateway', msg:'GET /api/v2/checkout 200 · user=<span class="val">usr_93451</span> · cached=false', latency:'142ms', trace:'live01' },
+  { level:'ERROR', service:'payment-svc', msg:'<span class="err">ConnectionTimeout</span>: pool wait exceeded · queue_depth=<span class="val">34</span>', latency:'30001ms', trace:'live02' },
+  { level:'WARN', service:'k8s-scheduler', msg:'Scheduling delay: <span class="warn-text">pod-pending &gt; 60s</span> · reason=Insufficient memory', latency:'—', trace:'live03' },
+  { level:'INFO', service:'redis-cache', msg:'SET session:<span class="highlight">usr_93451</span> · TTL=<span class="val">3600s</span> · size=<span class="val">2.4KB</span>', latency:'2ms', trace:'live04' },
+  { level:'DEBUG', service:'ml-inference', msg:'Feature extraction complete: <span class="val">48</span> time-series · <span class="highlight">3 anomalies</span> in window', latency:'89ms', trace:'live05' },
+];
+
+function injectLiveLog() {
+  const tbody = document.getElementById('logBody');
+  const msg = liveMessages[counter % liveMessages.length];
+  counter++;
+  const tr = document.createElement('tr');
+  tr.className = 'log-row new-entry' + (msg.level === 'ERROR' ? ' critical-row' : '');
+  const now = new Date().toISOString().replace('T',' ').slice(0,19);
+  tr.innerHTML = `
+    <td class="ts">${now}</td>
+    <td><span class="level-badge ${levelColors[msg.level]}">${msg.level}</span></td>
+    <td><span class="service-tag">${msg.service}</span></td>
+    <td class="log-msg">${msg.msg}</td>
+    <td class="latency ${latencyClass(msg.latency)}">${msg.latency}</td>
+    <td class="trace-id">${msg.trace}…</td>
+  `;
+  tbody.insertBefore(tr, tbody.firstChild);
+  // Remove oldest if too many
+  while (tbody.children.length > 50) tbody.removeChild(tbody.lastChild);
+}
+
+renderLogs();
+renderChart();
+updateClock();
+setInterval(updateClock, 1000);
+setInterval(updateIncident, 1000);
+setInterval(injectLiveLog, 2800);
+
+// Filter item interactions
+document.querySelectorAll('.filter-item, .service-item').forEach(el => {
+  el.addEventListener('click', () => {
+    el.closest('.sidebar-section').querySelectorAll('.filter-item').forEach(f => f.classList.remove('active'));
+    el.classList.toggle('active');
+  });
+});
+</script>
+</body>
+</html>
